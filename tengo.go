@@ -99,41 +99,60 @@ func (t *Tengo) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		return int(i), nil
 	}
 
-	for d.Next() {
-		for d.NextBlock(0) {
-			switch field := d.Val(); field {
-			case "max_allocs":
-				i, err := asInt()
-				if err != nil {
-					return d.Errf("%s: %w", field, err)
-				}
-				t.MaxAllocs = i
+	// config can be in a block:
+	//     tengo {
+	//         handler_path some/path/to/file.tengo
+	//         ... (other options)
+	//     }
+	//
+	// or a single-line if no advanced config is needed:
+	//     tengo path/to/file.tengo
+	//
+	var inBlock bool
+	if !d.Next() {
+		return d.Errf("%s: %w", "handler_path", d.ArgErr())
+	}
 
-			case "max_const_objects":
-				i, err := asInt()
-				if err != nil {
-					return d.Errf("%s: %w", field, err)
-				}
-				t.MaxConstObjects = i
-
-			case "cache_compiled_script":
-				if d.CountRemainingArgs() > 0 {
-					return d.Errf("%s: %w", field, d.ArgErr())
-				}
-
-			case "handler_path":
-				if !d.Args(&t.HandlerPath) {
-					return d.Errf("%s: %w", field, d.ArgErr())
-				}
-
-			case "import_dir":
-				if !d.Args(&t.ImportDir) {
-					return d.Errf("%s: %w", field, d.ArgErr())
-				}
-
-			default:
-				return d.Errf("%s: unknown configuration option", field)
+	for d.NextBlock(0) {
+		inBlock = true
+		switch field := d.Val(); field {
+		case "max_allocs":
+			i, err := asInt()
+			if err != nil {
+				return d.Errf("%s: %w", field, err)
 			}
+			t.MaxAllocs = i
+
+		case "max_const_objects":
+			i, err := asInt()
+			if err != nil {
+				return d.Errf("%s: %w", field, err)
+			}
+			t.MaxConstObjects = i
+
+		case "cache_compiled_script":
+			if d.CountRemainingArgs() > 0 {
+				return d.Errf("%s: %w", field, d.ArgErr())
+			}
+
+		case "handler_path":
+			if !d.Args(&t.HandlerPath) {
+				return d.Errf("%s: %w", field, d.ArgErr())
+			}
+
+		case "import_dir":
+			if !d.Args(&t.ImportDir) {
+				return d.Errf("%s: %w", field, d.ArgErr())
+			}
+
+		default:
+			return d.Errf("%s: unknown configuration option", field)
+		}
+	}
+
+	if !inBlock {
+		if !d.Args(&t.HandlerPath) {
+			return d.Errf("%s: %w", "handler_path", d.ArgErr())
 		}
 	}
 	return nil

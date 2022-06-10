@@ -1,0 +1,68 @@
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8080"
+					],
+					"routes": [
+						{
+							"match": [
+								{
+									"host": [
+										"localhost"
+									]
+								}
+							],
+							"handle": [
+								{
+									"handler": "subroute",
+									"routes": [
+										{
+											"handle": [
+												{
+													"handler": "subroute",
+													"routes": [
+														{
+															"handle": [
+																{
+																	"handler": "tengo",
+																	"handler_path": "test_handler.tengo",
+																	"import_dir": "./testdata",
+																	"max_allocs": 10,
+																	"max_const_objects": 100
+																}
+															]
+														},
+														{
+															"handle": [
+																{
+																	"browse": {},
+																	"handler": "file_server",
+																	"hide": [
+																		"./Caddyfile"
+																	]
+																}
+															]
+														}
+													]
+												}
+											]
+										}
+									]
+								}
+							],
+							"terminal": true
+						}
+					],
+					"automatic_https": {
+						"skip": [
+							"localhost"
+						]
+					}
+				}
+			}
+		}
+	}
+}

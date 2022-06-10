@@ -1,0 +1,12 @@
+http://localhost:8080
+
+route {
+  tengo {
+    handler_path test_handler.tengo
+    max_allocs 10
+    max_const_objects 100
+    import_dir ./testdata
+    cache_compiled_script
+  }
+  file_server browse
+}

@@ -1,0 +1,9 @@
+http://localhost:8080
+
+route {
+  tengo {
+    handler_path test_handler.tengo
+    cache_compiled_script ok
+  }
+  file_server browse
+}
