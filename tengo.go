@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -43,7 +44,7 @@ func (Tengo) CaddyModule() caddy.ModuleInfo {
 // Provision implements caddy.Provisioner.
 func (t *Tengo) Provision(ctx caddy.Context) error {
 	if t.CacheCompiledScript {
-		scr, err := loadHandlerScript(t.HandlerPath)
+		scr, err := t.loadHandlerScript()
 		if err != nil {
 			return err
 		}
@@ -73,7 +74,7 @@ func (t Tengo) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.
 			return err
 		}
 	} else {
-		scr, err := loadHandlerScript(t.HandlerPath)
+		scr, err := t.loadHandlerScript()
 		if err != nil {
 			return err
 		}
@@ -86,17 +87,50 @@ func (t Tengo) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.
 
 // UnmarshalCaddyfile implements caddyfile.Unmarshaler.
 func (t *Tengo) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+	asInt := func() (int, error) {
+		var s string
+		if !d.AllArgs(&s) {
+			return 0, d.ArgErr()
+		}
+		i, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return int(i), nil
+	}
+
 	for d.Next() {
 		for d.NextBlock(0) {
 			switch field := d.Val(); field {
+			case "max_allocs":
+				i, err := asInt()
+				if err != nil {
+					return d.Errf("%s: %w", field, err)
+				}
+				t.MaxAllocs = i
+
+			case "max_const_objects":
+				i, err := asInt()
+				if err != nil {
+					return d.Errf("%s: %w", field, err)
+				}
+				t.MaxConstObjects = i
+
 			case "cache_compiled_script":
 				if d.CountRemainingArgs() > 0 {
 					return d.Errf("%s: %w", field, d.ArgErr())
 				}
+
 			case "handler_path":
 				if !d.Args(&t.HandlerPath) {
 					return d.Errf("%s: %w", field, d.ArgErr())
 				}
+
+			case "import_dir":
+				if !d.Args(&t.ImportDir) {
+					return d.Errf("%s: %w", field, d.ArgErr())
+				}
+
 			default:
 				return d.Errf("%s: unknown configuration option", field)
 			}
@@ -112,8 +146,8 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	return t, err
 }
 
-func loadHandlerScript(path string) (*tengo.Script, error) {
-	b, err := os.ReadFile(path)
+func (t *Tengo) loadHandlerScript() (*tengo.Script, error) {
+	b, err := os.ReadFile(t.HandlerPath)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +155,19 @@ func loadHandlerScript(path string) (*tengo.Script, error) {
 	scr := tengo.NewScript(b)
 	scr.EnableFileImport(true)
 	scr.SetImports(stdlib.GetModuleMap(stdlib.AllModuleNames()...))
+
+	if t.ImportDir != "" {
+		if err := scr.SetImportDir(t.ImportDir); err != nil {
+			return nil, err
+		}
+	}
+	if t.MaxAllocs > 0 {
+		scr.SetMaxAllocs(int64(t.MaxAllocs))
+	}
+	if t.MaxConstObjects > 0 {
+		scr.SetMaxConstObjects(t.MaxConstObjects)
+	}
+
 	return scr, nil
 }
 
