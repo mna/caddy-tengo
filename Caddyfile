@@ -1,8 +1,15 @@
 http://localhost:8080
 
-route {
+route /a/* {
   tengo {
-    handler_path test_handler.tengo
+    handler_path test_handler_1.tengo
+  }
+  file_server browse
+}
+
+route /b/* {
+  tengo {
+    handler_path test_handler_2.tengo
   }
   file_server browse
 }

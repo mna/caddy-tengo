@@ -1,2 +1,0 @@
-fmt := import("fmt")
-fmt.println("hello from tengo!")

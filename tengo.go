@@ -69,18 +69,31 @@ func (t *Tengo) Validate() error {
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (t Tengo) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	var cmp *tengo.Compiled
 	if t.CacheCompiledScript {
-		if err := t.script.RunContext(r.Context()); err != nil {
-			return err
-		}
+		cmp = t.script
 	} else {
 		scr, err := t.loadHandlerScript()
 		if err != nil {
 			return err
 		}
-		if _, err := scr.RunContext(r.Context()); err != nil {
+		cmp, err = scr.Compile()
+		if err != nil {
 			return err
 		}
+	}
+
+	// TODO: set req/res on cmp
+	if err := cmp.Set("req", nil); err != nil {
+		return err
+	}
+	if err := cmp.Set("res", nil); err != nil {
+		return err
+	}
+
+	// run the tengo handler script
+	if err := cmp.RunContext(r.Context()); err != nil {
+		return err
 	}
 	return next.ServeHTTP(w, r)
 }
@@ -175,6 +188,15 @@ func (t *Tengo) loadHandlerScript() (*tengo.Script, error) {
 	scr.EnableFileImport(true)
 	scr.SetImports(stdlib.GetModuleMap(stdlib.AllModuleNames()...))
 
+	// define the "req" and "res" variables that will hold the request and
+	// response objects in the handler, respectively.
+	if err := scr.Add("req", nil); err != nil {
+		return nil, err
+	}
+	if err := scr.Add("res", nil); err != nil {
+		return nil, err
+	}
+
 	if t.ImportDir != "" {
 		if err := scr.SetImportDir(t.ImportDir); err != nil {
 			return nil, err
@@ -186,7 +208,6 @@ func (t *Tengo) loadHandlerScript() (*tengo.Script, error) {
 	if t.MaxConstObjects > 0 {
 		scr.SetMaxConstObjects(t.MaxConstObjects)
 	}
-
 	return scr, nil
 }
 
