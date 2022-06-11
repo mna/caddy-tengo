@@ -8,6 +8,8 @@ import (
 
 var httpModule = map[string]tengo.Object{}
 
+// NewResponseWriter creates the tengo type that exposes Go's
+// http.ResponseWriter to a tengo script.
 func NewResponseWriter(w http.ResponseWriter) *tengo.ImmutableMap {
 	var hdr *Header
 
@@ -70,6 +72,38 @@ func NewResponseWriter(w http.ResponseWriter) *tengo.ImmutableMap {
 					}
 					w.WriteHeader(int(a0.Value))
 					return tengo.UndefinedValue, nil
+				},
+			},
+		},
+	}
+}
+
+func NewIncomingRequest(r *http.Request) *tengo.ImmutableMap {
+	return &tengo.ImmutableMap{
+		Value: map[string]tengo.Object{
+			"method":      &tengo.String{Value: r.Method},
+			"url":         &tengo.String{Value: r.URL.String()},
+			"proto":       &tengo.String{Value: r.Proto},
+			"proto_major": &tengo.Int{Value: int64(r.ProtoMajor)},
+			"proto_minor": &tengo.Int{Value: int64(r.ProtoMinor)},
+			"host":        &tengo.String{Value: r.Host},
+
+			"basic_auth": &tengo.UserFunction{
+				Name: "basic_auth",
+				Value: func(args ...tengo.Object) (tengo.Object, error) {
+					if len(args) != 0 {
+						return nil, tengo.ErrWrongNumArguments
+					}
+					usr, pwd, ok := r.BasicAuth()
+					if !ok {
+						return tengo.UndefinedValue, nil
+					}
+					return &tengo.ImmutableMap{
+						Value: map[string]tengo.Object{
+							"username": &tengo.String{Value: usr},
+							"password": &tengo.String{Value: pwd},
+						},
+					}, nil
 				},
 			},
 		},
